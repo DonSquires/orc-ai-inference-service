@@ -4,37 +4,40 @@ import bodyParser from "body-parser";
 import { InferenceSession, Tensor } from "onnxruntime-node";
 import sharp from "sharp";
 
-const app = express();
-app.use(bodyParser.json({ limit: "15mb" }));
+const PORT = process.env.PORT || 3000;
+const ALLOWED = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
-// ALLOW SUPABASE + PREVIEW DOMAINS
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
-app.use(
-  cors({
-    origin: (origin, cb) => {
-      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-        return cb(null, true);
-      }
-      cb(new Error(`Origin ${origin} not allowed by CORS`));
-    },
-    methods: ["POST", "GET", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
-  })
-);
+const corsMiddleware = cors({
+  origin: (origin, cb) => {
+    if (!origin || ALLOWED.length === 0 || ALLOWED.includes(origin)) return cb(null, true);
+    cb(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"],
+});
+
+const app = express();
+app.use(corsMiddleware);
+app.use(bodyParser.json({ limit: "20mb" }));
 
 // LOAD MODELS (YOLO + Embedding)
 let yoloModel = null;
 let embedModel = null;
 
 async function loadModels() {
-  yoloModel = await InferenceSession.create("./models/yolo.onnx");
-  embedModel = await InferenceSession.create("./models/embedder.onnx");
-  console.log("✅ Models loaded");
+  try {
+    yoloModel = await InferenceSession.create("./models/yolo.onnx");
+    embedModel = await InferenceSession.create("./models/embedder.onnx");
+    console.log("✅ Models loaded");
+  } catch (e) {
+    console.warn("⚠️ Models not loaded yet (will report 'not loaded' in /health):", e.message);
+  }
 }
 
-loadModels().catch((err) => {
-  console.error("⚠️  Model loading failed:", err.message);
-});
+loadModels();
 
 // HEALTH CHECK
 app.get("/health", (req, res) => {
@@ -47,43 +50,55 @@ app.get("/health", (req, res) => {
   });
 });
 
+function toCHWFloat32(raw, width, height) {
+  const chw = new Float32Array(3 * width * height);
+  let rawIdx = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const r = raw[rawIdx++], g = raw[rawIdx++], b = raw[rawIdx++];
+      const idx = y * width + x;
+      chw[idx] = r / 255;                       // R
+      chw[width * height + idx] = g / 255;      // G
+      chw[2 * width * height + idx] = b / 255;  // B
+    }
+  }
+  return chw;
+}
+
 // MAIN INFERENCE ENDPOINT
 app.post("/infer", async (req, res) => {
   try {
-    const { image } = req.body; // base64 string
+    const { image } = req.body;
+    if (typeof image !== "string" || !image.includes(",")) {
+      return res.status(400).json({ error: "Missing or invalid image (base64 dataURL expected)" });
+    }
     const base64 = image.split(",")[1];
-    const imgBuffer = Buffer.from(base64, "base64");
+    const buf = Buffer.from(base64, "base64");
+    const width = 640, height = 640;
 
-    // PREPROCESS IMAGE → 640x640
-    const processed = await sharp(imgBuffer)
-      .resize(640, 640)
-      .toFormat("png")
+    const raw = await sharp(buf)
+      .resize(width, height, { fit: "cover" })
+      .removeAlpha()
+      .toColorspace("srgb")
       .raw()
       .toBuffer();
 
-    const inputTensor = new Tensor("float32", new Float32Array(processed), [
-      1, 3, 640, 640,
-    ]);
+    const chw = toCHWFloat32(raw, width, height);
+    const input = new Tensor("float32", chw, [1, 3, height, width]);
 
-    // YOLO DETECTION
-    const det = await yoloModel.run({ images: inputTensor });
+    if (!embedModel) return res.status(503).json({ error: "Embedding model not loaded" });
 
-    // For now we assume vehicle is detected; use entire image
-    const embed = await embedModel.run({ input: inputTensor });
-    const embedding = Array.from(embed.output.data);
+    const out = await embedModel.run({ input });
+    const firstKey = Object.keys(out)[0];
+    const outputTensor = out[firstKey];
+    const embedding = Array.from(outputTensor.data);
 
-    res.json({
-      embedding,
-      quality: null, // placeholder — replace with computed value
-      model_version: "v1.0",
-    });
+    res.json({ embedding, quality: null, model_version: "v1.0.0" });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    console.error("❌ /infer error:", err);
+    res.status(500).json({ error: String(err?.message || err) });
   }
 });
 
 // START SERVER
-app.listen(process.env.PORT || 3000, () =>
-  console.log("🔥 ORC AI Service running on port", process.env.PORT || 3000)
-);
+app.listen(PORT, () => console.log(`🔥 ORC AI Service running on port ${PORT}`));

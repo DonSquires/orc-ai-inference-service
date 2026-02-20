@@ -1,16 +1,20 @@
 {
   "name": "orc-ai-inference-service",
   "version": "1.0.0",
-  "main": "server.js",
   "type": "module",
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.21.1",
-    "body-parser": "^1.20.3",
-    "sharp": "^0.33.1",
-    "onnxruntime-node": "^1.17.1"
-  },
+  "main": "server.js",
+  "private": true,
   "scripts": {
     "start": "node server.js"
+  },
+  "dependencies": {
+    "body-parser": "1.20.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.1",
+    "onnxruntime-node": "^1.17.1",
+    "sharp": "^0.33.2"
+  },
+  "overrides": {
+    "qs": "^6.14.1"
   }
 }
