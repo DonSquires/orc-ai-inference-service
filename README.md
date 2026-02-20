@@ -50,19 +50,28 @@ curl http://localhost:3000/health
 ### First-time deploy
 
 1. Push / merge this branch to `main`.
-2. In the [Railway dashboard](https://railway.app/dashboard) → **New Project → Deploy from GitHub Repo** → select `DonSquires/orc-ai-inference-service`.
+2. Go to [railway.app/dashboard](https://railway.app/dashboard) → click **New Project** → **Deploy from GitHub Repo** → select `DonSquires/orc-ai-inference-service`.
 3. When Railway asks **"Select a folder"**, choose **`inference-service`**.  
    Railway will use `railway.json` to build with the Dockerfile and apply the health-check/restart policy automatically.
-4. Open **Settings → Networking → Generate Domain** to get your `.up.railway.app` URL.
-5. Set the following environment variables under **Variables**:
+4. Once the project is created you will land on the project canvas. **Click the service card** (the box labelled `orc-ai-inference-service` or `inference-service`) to open the service detail panel.
+5. **Add environment variables** — this is where to update `PORT`, `NODE_ENV`, and `ALLOWED_ORIGINS`:
+   1. In the service detail panel, click the **Variables** tab (top of the panel, between *Deployments* and *Settings*).
+   2. Click **New Variable** (or the **+ Add** button).
+   3. Add each row below, then click **Add** / **Save** after each one:
 
-   | Key               | Value                                                                                                 |
-   |-------------------|-------------------------------------------------------------------------------------------------------|
-   | `PORT`            | `3000`                                                                                                |
-   | `NODE_ENV`        | `production`                                                                                          |
-   | `ALLOWED_ORIGINS` | `https://xbfnlzmpumthnjmtqufp.supabase.co,https://preview-react-*.onspace.build`                     |
+      | Name              | Value                                                                              |
+      |-------------------|------------------------------------------------------------------------------------|
+      | `PORT`            | `3000`                                                                             |
+      | `NODE_ENV`        | `production`                                                                       |
+      | `ALLOWED_ORIGINS` | `https://xbfnlzmpumthnjmtqufp.supabase.co`                                        |
 
-   > The health-check path (`/health`), timeout (30 s), and restart policy are already configured in `railway.json` — no manual dashboard setup needed.
+   4. Railway will automatically trigger a redeploy once variables are saved.
+
+   > **Tip:** you can also paste all three at once using the **Raw Editor** button — enter one `KEY=VALUE` pair per line.
+
+   > The health-check path (`/health`), timeout (30 s), and restart policy are already configured in `railway.json` — no manual Settings changes needed.
+
+6. Open **Settings → Networking → Generate Domain** to get your `.up.railway.app` URL.
 
 ### Add ONNX models before deploying
 
