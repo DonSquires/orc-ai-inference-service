@@ -16,6 +16,10 @@ orc-ai-inference-service/
 │   └── models/
 │       ├── yolo.onnx       ← add your YOLO model here (git-ignored)
 │       └── embedder.onnx   ← add your embedding model here (git-ignored)
+├── supabase/
+│   └── functions/
+│       └── vehicle-ingest/
+│           └── index.ts    ← Deno edge function (OPTIONS preflight, POST → /infer)
 └── README.md
 ```
 
@@ -100,16 +104,51 @@ curl https://<your-service>.up.railway.app/health
 
 ## Connect to Supabase
 
+Set the Railway URL as a Supabase secret so the edge function can reach the inference service:
+
 ```bash
 supabase secrets set INFERENCE_SERVICE_URL="https://<your-service>.up.railway.app"
+supabase secrets set ALLOWED_ORIGINS="https://xbfnlzmpumthnjmtqufp.supabase.co,https://preview-react-*.onspace.build"
 ```
 
-Your Supabase Edge Function can then call:
+### `vehicle-ingest` edge function
 
-```typescript
-const result = await fetch(`${INFERENCE_SERVICE_URL}/infer`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ image: base64DataUrl }),
-});
+Located at `supabase/functions/vehicle-ingest/index.ts`.
+
+**Request (POST):**
+
+```json
+{
+  "image": "data:image/jpeg;base64,<base64>",
+  "gpsLatitude": 37.7749,
+  "gpsLongitude": -122.4194,
+  "recordedAt": "2026-02-20T08:00:00Z",
+  "officerId": "officer-uuid",
+  "idempotencyKey": "unique-key"
+}
+```
+
+**Response (`200 OK`):**
+
+```json
+{
+  "ok": true,
+  "inference": { "embedding": [...], "quality": null, "model_version": "v1.0.0" },
+  "meta": { "gpsLatitude": 37.7749, "gpsLongitude": -122.4194, "recordedAt": "...", "officerId": "...", "idempotencyKey": "..." }
+}
+```
+
+**Deploy the function:**
+
+```bash
+supabase functions deploy vehicle-ingest
+```
+
+**Test locally:**
+
+```bash
+supabase functions serve vehicle-ingest --env-file .env.local
+curl -X POST http://localhost:54321/functions/v1/vehicle-ingest \
+  -H "Content-Type: application/json" \
+  -d '{"image":"data:image/jpeg;base64,/9j/..."}'
 ```
