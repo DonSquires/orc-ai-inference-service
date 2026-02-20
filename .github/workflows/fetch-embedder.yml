@@ -1,29 +1,82 @@
-name: Fetch and attach ResNet50 ONNX
+name: Build models release (yolo + embedder)
 
 on:
+  # Run manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag name"
+        required: true
+        default: "v1-models"
+      add_yolo:
+        description: "Also upload yolov10.onnx if present on runner (true/false)"
+        required: true
+        default: "true"
 
+# IMPORTANT: allow uploading assets to Releases
 permissions:
-  contents: write   # <-- REQUIRED to upload release assets
+  contents: write
 
 jobs:
-  fetch-and-attach:
+  release-models:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout (optional, lets us access files in the repo)
         uses: actions/checkout@v4
 
-      - name: Download ResNet50 ONNX from HF
+      # 1) Download the EMBEDDER ONNX on the runner
+      #    This avoids corporate firewalls on your machine. The CI runner isn’t blocked.
+      - name: Download ResNet50 embedder
         run: |
           set -e
-          curl -L "https://huggingface.co/onnx/resnet50/resolve/main/resnet50.onnx?download=1" -o embedder.onnx
+          mkdir -p artifacts
+          curl -L "https://huggingface.co/onnx/resnet50/resolve/main/resnet50.onnx?download=1" -o artifacts/embedder.onnx
 
-      # If the release doesn't exist, this will create it; if it exists, it will update it.
-      - name: Release (create/update) + upload asset
+      # 2) (OPTIONAL) Bring YOUR yolov10.onnx onto the runner
+      #    Pick ONE of the two options below.
+      #
+      #    Option A (recommended long-term): attach yolov10.onnx to this repo’s Release once,
+      #    then future runs don’t need to upload it again.
+      #
+      #    Option B (one-off): commit yolov10.onnx anywhere in the repo (e.g. /models),
+      #    or add a curl to fetch it from where you’ve stored it, or upload it as a workflow artifact
+      #    in a previous job and download it here. Example below assumes the file is in the repo:
+      - name: (Optional) copy yolov10.onnx from repo
+        if: ${{ inputs.add_yolo == 'true' && hashFiles('**/yolov10.onnx') != '' }}
+        run: |
+          echo "Found yolov10.onnx in repo; copying to artifacts/"
+          cp $(git ls-files | grep -m1 'yolov10.onnx') artifacts/yolov10.onnx || true
+
+      # 3) Create/Update the Release and upload assets
+      #    - If the tag exists: updates the release and uploads/overwrites assets
+      #    - If the tag does not exist: creates the release
+      #    Using softprops/action-gh-release which is actively maintained.
+      - name: Create/Update Release + Upload assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1-models
+          tag_name: ${{ inputs.tag_name }}
+          name: ${{ inputs.tag_name }}
+          draft: false
+          prerelease: false
           files: |
-            embedder.onnx
+            artifacts/embedder.onnx
+            artifacts/yolov10.onnx
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 4) Print the direct public URLs you can paste into Railway Dockerfile
+      - name: Print Release asset URLs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = core.getInput('tag_name') || 'v1-models';
+            const { data: rel } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag
+            });
+            core.info(`Release: ${rel.name}  (${rel.html_url})`);
+            for (const a of rel.assets) {
+              core.info(`Asset: ${a.name}  ->  ${a.browser_download_url}`);
+            }
