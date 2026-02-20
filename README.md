@@ -56,7 +56,8 @@ curl http://localhost:3000/health
 1. Push / merge this branch to `main`.
 2. Go to [railway.app/dashboard](https://railway.app/dashboard) → click **New Project** → **Deploy from GitHub Repo** → select `DonSquires/orc-ai-inference-service`.
 3. When Railway asks **"Select a folder"**, choose **`inference-service`**.  
-   Railway will use `railway.json` to build with the Dockerfile and apply the health-check/restart policy automatically.
+   Railway will use `railway.json` to build with the Dockerfile and apply the health-check/restart policy automatically.  
+   > ⚠️ If you skip this step, Railway scans the repo root and Railpack fails with "could not determine how to build the app." See [Troubleshooting](#troubleshooting) below to fix it after the fact.
 4. Once the project is created you will land on the project canvas. **Click the service card** (the box labelled `orc-ai-inference-service` or `inference-service`) to open the service detail panel.
 5. **Add environment variables** — this is where to update `PORT`, `NODE_ENV`, and `ALLOWED_ORIGINS`:
    1. In the service detail panel, click the **Variables** tab (top of the panel, between *Deployments* and *Settings*).
@@ -101,6 +102,23 @@ Railway dashboard, select the service, and click **Redeploy**.
 curl https://<your-service>.up.railway.app/health
 # {"status":"healthy","models":{"yolo":"loaded","embedding":"loaded"}}
 ```
+
+## Troubleshooting
+
+### `✖ Railpack could not determine how to build the app`
+
+**Cause:** Railway is scanning the repository root (`/`) which contains only `README.md` and `.gitignore`. Railpack finds no recognisable project files there and fails.
+
+**Fix — set the root directory to `inference-service/`:**
+
+1. Open the Railway dashboard → select your project → click the service card.
+2. Go to **Settings → Source → Root Directory**.
+3. Set it to **`inference-service`** (no leading slash).
+4. Click **Save** and then **Redeploy**.
+
+Railway will now build from `inference-service/`, find the `Dockerfile` and `railway.json`, and use the Dockerfile builder instead of Railpack.
+
+> **Why this works:** `inference-service/railway.json` sets `"builder": "DOCKERFILE"`, which tells Railway to use the `Dockerfile` directly and skip Railpack entirely. This only takes effect when Railway's root directory is pointed at `inference-service/`.
 
 ## Connect to Supabase
 
