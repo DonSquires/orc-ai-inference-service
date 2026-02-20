@@ -78,18 +78,37 @@ curl http://localhost:3000/health
 
 6. Open **Settings → Networking → Generate Domain** to get your `.up.railway.app` URL.
 
-### Add ONNX models before deploying
+### ONNX models — choose a storage option
 
-Place your model files in `inference-service/models/` before building the Docker
-image, or mount them at runtime:
+You have two options. **Pick one** and follow the steps.
 
-```bash
-cp /path/to/yolo.onnx      inference-service/models/
-cp /path/to/embedder.onnx  inference-service/models/
-```
+#### Option A — Commit models to the repo *(simplest)*
 
-> The files are git-ignored so they won't be committed to the repository.
-> They must be present inside the Docker build context when `docker build` runs.
+1. Remove the `*.onnx` line from the root `.gitignore`.
+2. Copy your models into the repo:
+   ```bash
+   cp /path/to/yolo.onnx      inference-service/models/
+   cp /path/to/embedder.onnx  inference-service/models/
+   ```
+3. Commit and push. Railway packages them inside the container automatically.
+
+> ✔ Easiest. No extra storage needed.  
+> ❗ Repo grows larger; models become version-controlled.
+
+#### Option B — Download models during Docker build *(recommended for large models)*
+
+1. Upload `yolo.onnx` and `embedder.onnx` to external storage (GitHub Releases, Supabase Storage, Cloudflare R2, AWS S3, etc.).
+2. Uncomment and fill in the `RUN curl` lines near the bottom of `inference-service/Dockerfile`:
+   ```dockerfile
+   RUN curl -fsSL "https://your-bucket/models/yolo.onnx"      -o ./models/yolo.onnx
+   RUN curl -fsSL "https://your-bucket/models/embedder.onnx"  -o ./models/embedder.onnx
+   ```
+3. Commit and push. Railway downloads the models at build time.
+
+> ✔ Repo stays clean; models updated independently of code.  
+> ❗ Build time increases; URLs must stay accessible during builds.
+
+See [`inference-service/models/README.md`](inference-service/models/README.md) for more detail on both options.
 
 ### Redeploy after changes
 
