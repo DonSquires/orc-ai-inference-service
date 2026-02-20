@@ -12,6 +12,7 @@ orc-ai-inference-service/
 │   ├── server.js       ← Express + ONNX server (ESM)
 │   ├── package.json
 │   ├── Dockerfile
+│   ├── railway.json    ← Railway build/deploy config (Dockerfile builder, /health check)
 │   └── models/
 │       ├── yolo.onnx       ← add your YOLO model here (git-ignored)
 │       └── embedder.onnx   ← add your embedding model here (git-ignored)
@@ -51,7 +52,7 @@ curl http://localhost:3000/health
 1. Push / merge this branch to `main`.
 2. In the [Railway dashboard](https://railway.app/dashboard) → **New Project → Deploy from GitHub Repo** → select `DonSquires/orc-ai-inference-service`.
 3. When Railway asks **"Select a folder"**, choose **`inference-service`**.  
-   Railway will detect `Dockerfile` and build the container automatically.
+   Railway will use `railway.json` to build with the Dockerfile and apply the health-check/restart policy automatically.
 4. Open **Settings → Networking → Generate Domain** to get your `.up.railway.app` URL.
 5. Set the following environment variables under **Variables**:
 
@@ -61,7 +62,7 @@ curl http://localhost:3000/health
    | `NODE_ENV`        | `production`                                                                                          |
    | `ALLOWED_ORIGINS` | `https://xbfnlzmpumthnjmtqufp.supabase.co,https://preview-react-*.onspace.build`                     |
 
-6. Under **Settings → Health Check**, set the path to `/health`.
+   > The health-check path (`/health`), timeout (30 s), and restart policy are already configured in `railway.json` — no manual dashboard setup needed.
 
 ### Add ONNX models before deploying
 
