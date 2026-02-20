@@ -5,8 +5,21 @@ import { InferenceSession, Tensor } from "onnxruntime-node";
 import sharp from "sharp";
 import { fileURLToPath } from "url";
 import { join, dirname } from "path";
+import fs from "fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Log whether ONNX model files are present and their sizes on startup
+function logFileStatus(p) {
+  try {
+    const s = fs.statSync(p);
+    console.log(`ℹ️  File present: ${p}  (${s.size} bytes)`);
+  } catch {
+    console.warn(`⚠️  File missing: ${p}`);
+  }
+}
+logFileStatus(join(__dirname, "models", "yolo.onnx"));
+logFileStatus(join(__dirname, "models", "embedder.onnx"));
 
 const PORT = process.env.PORT || 3000;
 const ALLOWED = (process.env.ALLOWED_ORIGINS || "")
@@ -30,14 +43,22 @@ app.use(bodyParser.json({ limit: "20mb" }));
 // LOAD MODELS (YOLO + Embedding)
 let yoloModel = null;
 let embedModel = null;
+const modelErrors = { yolo: null, embedding: null };
 
 async function loadModels() {
   try {
     yoloModel = await InferenceSession.create(join(__dirname, "models", "yolo.onnx"));
-    embedModel = await InferenceSession.create(join(__dirname, "models", "embedder.onnx"));
-    console.log("✅ Models loaded");
+    console.log("✅ YOLO model loaded");
   } catch (e) {
-    console.warn("⚠️ Models not loaded yet (will report 'not loaded' in /health):", e.message);
+    modelErrors.yolo = String(e?.message || e);
+    console.warn("⚠️  YOLO load error:", modelErrors.yolo);
+  }
+  try {
+    embedModel = await InferenceSession.create(join(__dirname, "models", "embedder.onnx"));
+    console.log("✅ Embedder model loaded");
+  } catch (e) {
+    modelErrors.embedding = String(e?.message || e);
+    console.warn("⚠️  Embedder load error:", modelErrors.embedding);
   }
 }
 
@@ -51,6 +72,7 @@ app.get("/health", (req, res) => {
       yolo: yoloModel ? "loaded" : "not loaded",
       embedding: embedModel ? "loaded" : "not loaded",
     },
+    errors: modelErrors,
   });
 });
 
