@@ -4,19 +4,26 @@ An ONNX-based vehicle inference service built with Node.js and Express.
 
 ## Deployment
 
-Railpack and Railway build from the **repository root**. The root `Dockerfile` is the deploy entrypoint — it copies the application from `inference-service/` and downloads ONNX model assets from GitHub Releases during the image build.
+### Railpack / Railway
 
-## Local Docker build
+Railpack detects this as a **Node.js** app via the root `package.json` and runs `npm start` (`node server.js`). No extra configuration is required — Railpack will install dependencies and start the server automatically.
+
+ONNX models are downloaded from this repository's GitHub Releases (`v1-models`) at container build time (Docker) or can be placed in a `models/` directory at the repo root. If models are absent, the service starts normally and the `/health` endpoint reports their status.
+
+### Docker
+
+The root `Dockerfile` is the deploy entrypoint for Docker-based builds (e.g. when building locally or via a Docker-aware CI):
 
 ```bash
-# Build the image from repo root
+# Build from repo root
 docker build -t orc-inference .
 
-# Run the container (service listens on port 3000)
+# Run (service listens on port 3000)
 docker run --rm -p 3000:3000 orc-inference
 ```
 
-The `/health` endpoint will confirm the service is running:
+Verify the service is running:
+
 ```bash
 curl http://localhost:3000/health
 ```
@@ -25,5 +32,8 @@ curl http://localhost:3000/health
 
 | Path | Description |
 |------|-------------|
-| `Dockerfile` | Root-level deploy entrypoint (used by Railpack / Railway) |
-| `inference-service/` | Application source: `server.js`, `package.json`, `Dockerfile` |
+| `package.json` | Root-level Node manifest — used by Railpack for detection and `npm install` |
+| `server.js` | Application entry point — `npm start` runs this |
+| `Dockerfile` | Docker build entrypoint (downloads ONNX models from GitHub Releases) |
+| `inference-service/` | Standalone copy of the app for subdirectory-based builds |
+
