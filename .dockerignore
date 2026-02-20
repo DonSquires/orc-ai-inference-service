@@ -1,0 +1,4 @@
+# Exclude development/CI files from Docker build context
+.github
+.git
+*.md
