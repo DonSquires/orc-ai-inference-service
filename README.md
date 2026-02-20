@@ -8,10 +8,10 @@ All deploy artifacts live in [`inference-service/`](./inference-service/).
 
 | File | Purpose |
 |---|---|
-| `inference-service/server.js` | Express server – `/health` and `/infer` endpoints |
+| `inference-service/server.js` | Express server – `/health` (always 200) and `/infer` endpoints |
 | `inference-service/package.json` | Node dependencies and `start` script |
-| `inference-service/Dockerfile` | Docker image definition (downloads ONNX models at build time) |
-| `inference-service/railway.json` | Railway configuration (Dockerfile builder, `/health` check) |
+| `inference-service/Dockerfile` | Docker image definition (attempts to download ONNX models at build time) |
+| `railway.json` | Railway configuration – Dockerfile builder, `/health` check, 300 s timeout |
 
 ## Railway deployment
 
