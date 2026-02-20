@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Install Node dependencies first (layer cache friendly)
-COPY package.json ./
+COPY inference-service/package.json ./
 RUN npm install --omit=dev
 
 # Download ONNX models from the v1-models release
@@ -22,7 +22,7 @@ RUN mkdir -p models \
        || echo "INFO: yolov10.onnx not found in release – service will start in degraded mode") \
   && ls -lh models/
 
-COPY server.js ./
+COPY inference-service/server.js ./
 
 EXPOSE 3000
 

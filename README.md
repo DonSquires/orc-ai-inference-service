@@ -16,8 +16,8 @@ All deploy artifacts live in [`inference-service/`](./inference-service/).
 ## Railway deployment
 
 1. Create a new Railway service pointing at this repository.
-2. Set **Root Directory** to `inference-service`.
-3. Railway will use the `Dockerfile` and `railway.json` inside that directory.
+2. Railway will automatically detect the root-level `railway.json` and build using `inference-service/Dockerfile`.
+3. No manual Root Directory configuration is needed.
 
 ## ONNX models
 
