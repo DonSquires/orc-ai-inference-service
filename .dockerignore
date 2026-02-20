@@ -1,0 +1,5 @@
+# Build context is the repo root; exclude anything that shouldn't be sent to Docker
+inference-service/node_modules/
+inference-service/models/*.onnx
+.git/
+.github/
