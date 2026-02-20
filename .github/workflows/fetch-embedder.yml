@@ -1,0 +1,39 @@
+name: Fetch and attach ResNet50 ONNX
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fetch-and-attach:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Download ResNet50 ONNX from HF
+        run: |
+          set -e
+          curl -L "https://huggingface.co/onnx/resnet50/resolve/main/resnet50.onnx?download=1" -o embedder.onnx
+
+      - name: Get release by tag
+        id: get_release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = 'v1-models';
+            const {data} = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag
+            });
+            core.setOutput('upload_url', data.upload_url);
+
+      - name: Upload embedder.onnx to the release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: ./embedder.onnx
+          asset_name: embedder.onnx
+          asset_content_type: application/octet-stream
