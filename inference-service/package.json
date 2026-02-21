@@ -1,0 +1,21 @@
+{
+  "name": "orc-ai-inference-service",
+  "version": "1.0.0",
+  "description": "Vehicle AI inference service (YOLO detection + ResNet50 embeddings)",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "onnxruntime-node": "^1.17.3"
+  },
+  "overrides": {
+    "qs": "^6.14.1"
+  }
+}
