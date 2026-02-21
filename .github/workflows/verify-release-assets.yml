@@ -1,0 +1,21 @@
+name: Verify release assets
+on:
+  pull_request:
+    paths: [ ".github/workflows/**", "scripts/download-models.js", "Dockerfile", "**/*.onnx" ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Check v1-models assets
+        run: |
+          set -euo pipefail
+          rel=$(curl -fsSL -H "Accept: application/vnd.github+json" \
+               https://api.github.com/repos/DonSquires/orc-ai-inference-service/releases/tags/v1-models)
+          embed=$(echo "$rel" | jq -r '.assets[] | select(.name=="embedder.onnx") | .size')
+          yolo=$(echo "$rel" | jq -r '.assets[] | select(.name=="yolov10.onnx") | .size')
+          echo "embedder.onnx size: $embed"
+          echo "yolov10.onnx size: $yolo"
+          test -n "$embed" && [ "$embed" -ge 5242880 ] || (echo "Bad embedder.onnx size"; exit 1)
+          test -n "$yolo"  && [ "$yolo"  -ge 5242880 ] || (echo "Bad yolov10.onnx size"; exit 1)
