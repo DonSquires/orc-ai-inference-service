@@ -9,8 +9,9 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "onnxruntime-node": "^1.17.3",
-    "qs": "^6.14.1"
+    "express": "^4.22.1",
+    "onnxruntime-node": "^1.24.2",
+    "qs": "^6.15.0",
+    "sharp": "^0.34.5"
   }
 }

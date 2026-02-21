@@ -2,6 +2,19 @@
 
 Railway-deployed ONNX inference service (YOLOv10 + embedding model).
 
+## Release assets required
+
+Before the Docker image can be built, the `v1-models` GitHub Release must contain **real** ONNX files:
+
+| Asset | Expected size | Notes |
+|---|---|---|
+| `yolov10.onnx` | ~28 MB | YOLOv10 detection model |
+| `embedder.onnx` | ~94 MB | ResNet-50 embedding model |
+
+> ⚠️ The current `embedder.onnx` in the `v1-models` release is a 29-byte placeholder.
+> Re-run the **"Build models release"** workflow (`.github/workflows/fetch-embedder.yml`)
+> to upload a real ResNet-50 ONNX file, then rebuild the Docker image.
+
 ## Railway setup
 
 > **Railway Root Directory must be set to `inference-service/`**
@@ -48,6 +61,42 @@ Expected `/ready` response when models are loaded:
   "errors": { "yolo": null, "embedding": null }
 }
 ```
+
+### Run inference
+
+```bash
+# Encode a test image as base64
+IMAGE_B64=$(base64 -w0 /path/to/test.jpg)
+
+curl -s -X POST http://localhost:3000/infer \
+  -H 'Content-Type: application/json' \
+  -d "{\"image\":\"$IMAGE_B64\"}" | jq .
+```
+
+Expected `/infer` response:
+
+```json
+{
+  "ok": true,
+  "inference": {
+    "detections": [
+      {
+        "bbox": [0.12, 0.34, 0.56, 0.78],
+        "confidence": 0.92,
+        "classId": 2,
+        "embedding": [0.041, -0.12, ...]
+      }
+    ]
+  },
+  "meta": {
+    "model": "yolov10+embedder",
+    "processingMs": 145,
+    "detectionsCount": 1
+  }
+}
+```
+
+`bbox` values are normalised to `[0, 1]` relative to the original image dimensions (`[x1, y1, x2, y2]`).
 
 ## Production verification (Railway)
 

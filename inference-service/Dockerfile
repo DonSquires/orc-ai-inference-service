@@ -6,9 +6,9 @@ ARG MODEL_TAG=v1-models
 
 WORKDIR /app
 
-# Install curl for model downloads
+# Install curl + sharp runtime deps
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
+ && apt-get install -y --no-install-recommends curl libvips42 \
  && rm -rf /var/lib/apt/lists/*
 
 # Download ONNX models from GitHub release — fails fast on 404 / auth errors
