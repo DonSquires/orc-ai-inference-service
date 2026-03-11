@@ -1,0 +1,82 @@
+name: Verify release assets
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "scripts/download-models.js"
+      - "Dockerfile"
+      - "**/*.onnx"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions: read-all
+    env:
+      TAG: v1-models
+      MIN_SIZE_BYTES: 5242880   # 5 MiB threshold — adjust if needed
+      GITHUB_API_URL: https://api.github.com
+      REPO: DonSquires/orc-ai-inference-service
+    steps:
+      - name: Ensure jq present
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y jq
+          fi
+          jq --version
+
+      - name: Verify v1-models assets exist and are large enough
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Build headers, prefer token to avoid rate limits / support private repos
+          HDR=(-H "Accept: application/vnd.github+json")
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            HDR+=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+          fi
+
+          echo "::group::Fetch release JSON"
+          set +e
+          HTTP_CODE=$(curl -sS -w "%{http_code}" -o rel.json "${HDR[@]}" \
+            --retry 3 --retry-delay 2 --retry-connrefused \
+            "$GITHUB_API_URL/repos/$REPO/releases/tags/$TAG")
+          EXIT=$?
+          set -e
+          if [ "$EXIT" -ne 0 ] || [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "Failed to fetch release tag '$TAG' (HTTP $HTTP_CODE)."
+            [ -f rel.json ] && cat rel.json || true
+            exit 1
+          fi
+          echo "::endgroup::"
+
+          echo "::group::Parse asset sizes"
+          embed_size=$(jq -r '.assets[] | select(.name=="embedder.onnx") | .size // empty' rel.json)
+          yolo_size=$(jq -r '.assets[] | select(.name=="yolov10.onnx")  | .size // empty' rel.json)
+          embed_url=$(jq -r '.assets[] | select(.name=="embedder.onnx") | .browser_download_url // empty' rel.json)
+          yolo_url=$(jq -r '.assets[] | select(.name=="yolov10.onnx")  | .browser_download_url // empty' rel.json)
+
+          echo "embedder.onnx size: ${embed_size:-<missing>} url: ${embed_url:-<missing>}"
+          echo "yolov10.onnx size: ${yolo_size:-<missing>} url: ${yolo_url:-<missing>}"
+          echo "::endgroup::"
+
+          missing=""
+          [ -z "${embed_size:-}" ] && missing="${missing:+$missing, }embedder.onnx"
+          [ -z "${yolo_size:-}" ]  && missing="${missing:+$missing, }yolov10.onnx"
+          if [ -n "$missing" ]; then
+            echo "Missing asset(s) from release '$TAG': $missing. Full JSON follows for debugging:"
+            jq . rel.json
+            exit 1
+          fi
+
+          if [ "$embed_size" -lt "$MIN_SIZE_BYTES" ]; then
+            echo "embedder.onnx is too small ($embed_size bytes) — expected >= $MIN_SIZE_BYTES"
+            exit 1
+          fi
+          if [ "$yolo_size" -lt "$MIN_SIZE_BYTES" ]; then
+            echo "yolov10.onnx is too small ($yolo_size bytes) — expected >= $MIN_SIZE_BYTES"
+            exit 1
+          fi
+
+          echo "✅ Release assets look good (both >= $MIN_SIZE_BYTES bytes)."
